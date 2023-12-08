@@ -423,7 +423,7 @@ def quote_url(url):
     return quoted_url
 
 
-class _ArtifactoryFlavour(pathlib._Flavour):
+class _ArtifactoryFlavour:
     """
     Implements Artifactory-specific pure path manipulations.
     I.e. what is 'drive', 'root' and 'path' and how to split full path into
@@ -587,6 +587,14 @@ class _ArtifactoryFlavour(pathlib._Flavour):
         'path' unmodified.
         """
         return path
+
+    def normcase(self, s):
+        # py312: directly to posixpath
+        return pathlib.posixpath.normcase(s)
+
+    def join(self, a, *p):
+        # py312: directly to posixpath
+        return pathlib.posixpath.join(a, *p)
 
 
 class _ArtifactorySaaSFlavour(_ArtifactoryFlavour):
@@ -1521,6 +1529,9 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
         only then add auth information.
         """
         obj = pathlib.Path.__new__(cls, *args, **kwargs)
+        if sys.version_info.major == 3 and sys.version_info.minor == 12:
+            # Assign _raw_paths:
+            obj.__init__(*args, **kwargs)
 
         cfg_entry = get_global_config_entry(obj.drive)
 
@@ -1595,6 +1606,15 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
         obj.timeout = self.timeout
         return obj
 
+    def is_relative_to(self, other):
+        # is_relative_to() on py312 only checks "other in self.parents", so it
+        # does not handle the corner-case where self.parts[0] is a substring
+        # within other.parts[0]. (eg. "other.root" is a blank string, and
+        # "self.root" is a repository directory.)
+        # This is not a great solution, and we probably need to splitting self.parts[0]
+        # with "/" or something, but it's a hack.
+        return other == self or other in self.parents or self.parts[0].startswith(str(other))
+
     @property
     def replication_status(self):
         """
@@ -1610,12 +1630,14 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
 
         return resp
 
-    def stat(self, pathobj=None):
+    def stat(self, pathobj=None, follow_symlinks=True):
         """
         Request remote file/directory status info
         Returns an object of class ArtifactoryFileStat.
         :param pathobj: (Optional) path like object for which to get stats.
             if None is provided then applied to ArtifactoryPath itself
+        :param follow_symlinks: (Optional) No effect / not implemented.
+            Provides API compatibility with pathlib.Path.
 
         The following fields are available:
           created -- file creation time
@@ -1733,6 +1755,7 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
         a subpath of the other path), raise ValueError.
         """
         obj = super(ArtifactoryPath, self).relative_to(*other)
+        obj._root = self.root
         obj.auth = self.auth
         obj.verify = self.verify
         obj.cert = self.cert
