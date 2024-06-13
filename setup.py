@@ -56,6 +56,7 @@ setup(
         "requests>=2.30.0",
         "python-dateutil",
         "PyJWT~=2.0",
+        "pathlib-abc; python_version <= '3.12'",
     ],
     extras_require={"tests": tests_require},
     zip_safe=False,
