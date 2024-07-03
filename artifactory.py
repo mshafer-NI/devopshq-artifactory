@@ -62,6 +62,10 @@ try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
+try:
+    from pathlib_abc import PurePathBase
+except ImportError:
+    pass
 
 if "DOHQ_ARTIFACTORY_PYTHON_CFG" in os.environ:
     default_config_path = os.environ["DOHQ_ARTIFACTORY_PYTHON_CFG"]
@@ -1467,14 +1471,14 @@ class ArtifactoryOpensourceAccessor(_ArtifactoryAccessor):
     """
 
 
-class PureArtifactoryPath(pathlib.PurePath):
+class PureArtifactoryPath(PurePathBase):
     """
     A class to work with Artifactory paths that doesn't connect
     to Artifactory server. I.e. it supports only basic path
     operations.
     """
 
-    _flavour = _artifactory_flavour
+    # _flavour = _artifactory_flavour
     __slots__ = ()
 
 
