@@ -100,6 +100,3 @@ docker start artifactory-pro
 # Remove installed Artifactory. You'll have to comlete initialize steps again!
 docker rm artifactory-pro
 ```
-
-
-
