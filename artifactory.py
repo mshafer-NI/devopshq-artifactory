@@ -454,6 +454,18 @@ class _ArtifactoryFlavour:
         return re.compile(fnmatch.translate(pattern), re.IGNORECASE).fullmatch
 
     def parse_parts(self, parts):
+        """
+        parse and return drive, root and relative path
+
+        >>> _ArtifactoryFlavour().parse_parts(["/artifactory", "libs-snapshot-local", "org/acme"])
+        ('/artifactory', '', ['/artifactory', 'libs-snapshot-local', 'org', 'acme'])
+
+        >>> _ArtifactoryFlavour().parse_parts(["/artifactory/libs-snapshot-local/org/acme"])
+        ('/artifactory', 'libs-snapshot-local', ['/artifactory/libs-snapshot-local', 'org', 'acme'])
+
+        >>> _ArtifactoryFlavour().parse_parts(["/", "libs-snapshot-local", "org/acme"])
+        ('', '', ['libs-snapshot-local', 'org', 'acme'])
+        """
         drv, root, parsed = super(_ArtifactoryFlavour, self).parse_parts(parts)
         return drv, root, parsed
 
