@@ -1551,6 +1551,18 @@ class PureArtifactoryPath(pathlib.PurePath):
     _flavour = _artifactory_flavour
     __slots__ = ()
 
+    def __init__(self, *args, **kwargs):
+        super(PureArtifactoryPath, self).__init__(*args, **kwargs)
+        self._drive = ''
+
+    @property
+    def drive(self):
+        return self._drive
+
+    @property
+    def _root(self):
+        return self.root
+
 
 class _FakePathTemplate(object):
     def __init__(self, accessor):
