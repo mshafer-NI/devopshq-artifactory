@@ -36,6 +36,7 @@ import re
 import sys
 import urllib.parse
 from itertools import islice
+from warnings import warn
 
 import dateutil.parser
 import requests
@@ -62,10 +63,6 @@ try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
-try:
-    from pathlib_abc import PurePathBase
-except ImportError:
-    pass
 
 if "DOHQ_ARTIFACTORY_PYTHON_CFG" in os.environ:
     default_config_path = os.environ["DOHQ_ARTIFACTORY_PYTHON_CFG"]
@@ -414,13 +411,13 @@ def quote_url(url):
     parsed_url = urllib3.util.parse_url(url)
     if parsed_url.port:
         quoted_path = requests.utils.quote(
-            url.partition(f"{parsed_url.host}:{parsed_url.port}")[2]
+            url.rpartition(f"{parsed_url.host}:{parsed_url.port}")[2]
         )
         quoted_url = (
             f"{parsed_url.scheme}://{parsed_url.host}:{parsed_url.port}{quoted_path}"
         )
     else:
-        quoted_path = requests.utils.quote(url.partition(parsed_url.host)[2])
+        quoted_path = requests.utils.quote(url.rpartition(parsed_url.host)[2])
         quoted_url = f"{parsed_url.scheme}://{parsed_url.host}{quoted_path}"
 
     return quoted_url
@@ -466,7 +463,41 @@ class _ArtifactoryFlavour:
         >>> _ArtifactoryFlavour().parse_parts(["/", "libs-snapshot-local", "org/acme"])
         ('', '', ['libs-snapshot-local', 'org', 'acme'])
         """
-        drv, root, parsed = super(_ArtifactoryFlavour, self).parse_parts(parts)
+        parsed = []
+        sep = self.sep
+        altsep = self.altsep
+        drv = root = ''
+        it = reversed(parts)
+        for part in it:
+            if not part:
+                continue
+            if altsep:
+                part = part.replace(altsep, sep)
+            drv, root, rel = self.splitroot(part)
+            if sep in rel:
+                for x in reversed(rel.split(sep)):
+                    if x and x != '.':
+                        parsed.append(sys.intern(x))
+            else:
+                if rel and rel != '.':
+                    parsed.append(sys.intern(rel))
+            if drv or root:
+                if not drv:
+                    # If no drive is present, try to find one in the previous
+                    # parts. This makes the result of parsing e.g.
+                    # ("C:", "/", "a") reasonably intuitive.
+                    for part in it:
+                        if not part:
+                            continue
+                        if altsep:
+                            part = part.replace(altsep, sep)
+                        drv = self.splitroot(part)[0]
+                        if drv:
+                            break
+                break
+        if drv or root:
+            parsed.append(drv + root)
+        parsed.reverse()
         return drv, root, parsed
 
     def join_parsed_parts(self, drv, root, parts, drv2, root2, parts2):
@@ -900,7 +931,7 @@ class _ArtifactoryAccessor:
         )
         code = response.status_code
         text = response.text
-        if code == 404 and ("Unable to find item" in text or "Not Found" in text or "File not found" in text):
+        if code == 404 and ("Unable to find item" in text or "Not Found" in text):
             raise OSError(2, f"No such file or directory: {url}")
 
         raise_for_status(response)
@@ -1168,7 +1199,7 @@ class _ArtifactoryAccessor:
         explode_archive_atomic=None,
         checksum=None,
         by_checksum=False,
-        quote_parameters=True,
+        quote_parameters=None,  # TODO: v0.10.0: change default to True
     ):
         """
         Uploads a given file-like object
@@ -1187,8 +1218,16 @@ class _ArtifactoryAccessor:
         :param checksum: sha1Value or sha256Value
         :param by_checksum: (bool) if True, deploy artifact by checksum, default False
         :param quote_parameters: (bool) if True, apply URL quoting to matrix parameter names and values,
-            default True since v0.10.0
+            default False until v0.10.0
         """
+
+        if quote_parameters is None:
+            warn(
+                "The current default value of quote_parameters (False) will change to True in v0.10.0.\n"
+                "To ensure consistent behavior and remove this warning, explicitly set a value for quote_parameters.\n"
+                "For more details see https://github.com/devopshq/artifactory/issues/408."
+            )
+            quote_parameters = False
 
         if fobj and by_checksum:
             raise ArtifactoryException("Either fobj or by_checksum, but not both")
@@ -1491,14 +1530,14 @@ class ArtifactoryOpensourceAccessor(_ArtifactoryAccessor):
     """
 
 
-class PureArtifactoryPath(PurePathBase):
+class PureArtifactoryPath(pathlib.PurePath):
     """
     A class to work with Artifactory paths that doesn't connect
     to Artifactory server. I.e. it supports only basic path
     operations.
     """
 
-    # _flavour = _artifactory_flavour
+    _flavour = _artifactory_flavour
     __slots__ = ()
 
 
@@ -1878,7 +1917,11 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
         sha256 = hashlib.sha256(data).hexdigest()
 
         fobj = io.BytesIO(data)
-        self.deploy(fobj, md5=md5, sha1=sha1, sha256=sha256)
+        self.deploy(fobj, md5=md5, sha1=sha1, sha256=sha256, quote_parameters=False)
+        # TODO: v0.10.0 - possibly remove quote_parameters explicit setting
+        # Because this call never has parameters, it should not matter what it's set to.
+        # In this version, we set it explicitly to avoid the warning.
+        # In 0.10.0 or later, we can either keep it explicitly set to False, or remove it entirely.
         return len(data)
 
     def write_text(self, data, encoding="utf-8", errors="strict"):
@@ -1926,7 +1969,7 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
         """
         return self._accessor.creator(self)
 
-    def is_dir(self, *, follow_symlinks=True):
+    def is_dir(self):
         """
         Whether this path is a directory.
         """
@@ -2215,7 +2258,12 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
                     md5=stat.md5,
                     sha1=stat.sha1,
                     sha256=stat.sha256,
+                    quote_parameters=False,
                 )
+                # TODO: v0.10.0 - possibly remove quote_parameters explicit setting
+                # Because this call never has parameters, it should not matter what it's set to.
+                # In this version, we set it explicitly to avoid the warning.
+                # In 0.10.0 or later, we can either keep it explicitly set to False, or remove it entirely.
 
     def move(self, dst, suppress_layouts=False, fail_fast=False, dry_run=False):
         """
