@@ -406,6 +406,9 @@ def quote_url(url):
 
     :param url: (str) URL that should be quoted
     :return: (str) quoted URL
+
+    >>> quote_url("https://example.com/artifactory/foo/example.com/bar")
+    'https://example.com/artifactory/foo/example.com/bar'
     """
     logger.debug(f"Raw URL passed for encoding: {url}")
     parsed_url = urllib3.util.parse_url(url)
@@ -417,7 +420,7 @@ def quote_url(url):
             f"{parsed_url.scheme}://{parsed_url.host}:{parsed_url.port}{quoted_path}"
         )
     else:
-        quoted_path = requests.utils.quote(url.rpartition(parsed_url.host)[2])
+        quoted_path = requests.utils.quote(url.partition(parsed_url.host)[2])
         quoted_url = f"{parsed_url.scheme}://{parsed_url.host}{quoted_path}"
 
     return quoted_url
@@ -501,9 +504,17 @@ class _ArtifactoryFlavour:
         return drv, root, parsed
 
     def join_parsed_parts(self, drv, root, parts, drv2, root2, parts2):
-        drv2, root2, parts2 = super(_ArtifactoryFlavour, self).join_parsed_parts(
-            drv, root, parts, drv2, root2, parts2
-        )
+        if root2:
+            if not drv2 and drv:
+                drv2, root2, parts2 = drv, root2, [drv + root2] + parts2[1:]
+        elif drv2:
+            if drv2 == drv or self.casefold(drv2) == self.casefold(drv):
+                # Same drive => second path is relative to the first
+                drv2, root2, parts2 = drv, root, parts + parts2[1:]
+        else:
+            # Second path is non-anchored (common case)
+            drv2, root2, parts2 = drv, root, parts + parts2
+
 
         if not root2 and len(parts2) > 1:
             root2 = self.sep + parts2.pop(1) + self.sep
@@ -636,11 +647,11 @@ class _ArtifactoryFlavour:
 
     def normcase(self, s):
         # py312: directly to posixpath
-        return pathlib.posixpath.normcase(s)
+        return os.path.normcase(s)
 
     def join(self, a, *p):
         # py312: directly to posixpath
-        return pathlib.posixpath.join(a, *p)
+        return self.sep.join(a, *p)
 
 
 class _ArtifactorySaaSFlavour(_ArtifactoryFlavour):
