@@ -72,6 +72,7 @@ else:
     default_config_path = "~/.artifactory_python.cfg"
 global_config = None
 
+_PY_GREATER_THEN_3_11 = sys.version_info > (3,11)
 
 def read_config(config_path=default_config_path):
     """
@@ -651,7 +652,7 @@ class _ArtifactoryFlavour:
 
     def join(self, a, *p):
         # py312: directly to posixpath
-        return self.sep.join(a, *p)
+        return self.sep.join([a, *p])
 
 
 class _ArtifactorySaaSFlavour(_ArtifactoryFlavour):
@@ -1549,19 +1550,24 @@ class PureArtifactoryPath(pathlib.PurePath):
     """
 
     _flavour = _artifactory_flavour
-    __slots__ = ()
+    __slots__ = tuple((set(pathlib.PurePath.__slots__) - {"drive"}) | {"_drive"})
 
     def __init__(self, *args, **kwargs):
         super(PureArtifactoryPath, self).__init__(*args, **kwargs)
-        self._drive = ''
+        path = args[0]
+        self._drive = str(path).replace("\\", "/").split(self.root.rstrip("/") or "artifactory", maxsplit=1)[0].rstrip("/")
 
     @property
     def drive(self):
         return self._drive
 
-    @property
-    def _root(self):
-        return self.root
+    if _PY_GREATER_THEN_3_11:
+        def __div__(self, other):
+            return self.joinpath(other)
+
+        def __truediv__(self, other):
+            return self.joinpath(other)
+
 
 
 class _FakePathTemplate(object):
@@ -1579,6 +1585,24 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
     that create new path objects, have to also manually set the 'auth'
     field, since the copying strategy of pathlib.Path is not based
     on regular constructors, but rather on templates.
+
+    >>> ArtifactoryPath("http://b/artifactory/reponame").root
+    '/reponame/'
+
+    >>> ArtifactoryPath("http://b/reponame").root
+    '/reponame/'
+
+    >>> ArtifactoryPath("http://b//reponame").root
+    '/reponame/'
+
+    >>> ArtifactoryPath("http://b//reponame").drive
+    'http://b'
+
+    >>> ArtifactoryPath("http://b/reponame").drive
+    'http://b'
+
+    >>> ArtifactoryPath("http://b//artifactory/reponame").drive
+    'http://b//artifactory'
     """
 
     if sys.version_info.major == 3 and sys.version_info.minor >= 10:
