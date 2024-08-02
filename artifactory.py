@@ -72,7 +72,7 @@ else:
     default_config_path = "~/.artifactory_python.cfg"
 global_config = None
 
-_PY_GREATER_THEN_3_11 = sys.version_info > (3,11)
+_PY_GREATER_THEN_3_11 = sys.version_info[:2] > (3,11)
 
 def read_config(config_path=default_config_path):
     """
@@ -462,7 +462,7 @@ class _ArtifactoryFlavour:
         ('/artifactory', '', ['/artifactory', 'libs-snapshot-local', 'org', 'acme'])
 
         >>> _ArtifactoryFlavour().parse_parts(["/artifactory/libs-snapshot-local/org/acme"])
-        ('/artifactory', 'libs-snapshot-local', ['/artifactory/libs-snapshot-local', 'org', 'acme'])
+        ('/artifactory', '/libs-snapshot-local/', ['/artifactory/libs-snapshot-local/', 'org', 'acme'])
 
         >>> _ArtifactoryFlavour().parse_parts(["/", "libs-snapshot-local", "org/acme"])
         ('', '', ['libs-snapshot-local', 'org', 'acme'])
@@ -1553,20 +1553,53 @@ class PureArtifactoryPath(pathlib.PurePath):
     __slots__ = tuple((set(pathlib.PurePath.__slots__) - {"drive"}) | {"_drive"})
 
     def __init__(self, *args, **kwargs):
-        super(PureArtifactoryPath, self).__init__(*args, **kwargs)
-        path = args[0]
-        self._drive = str(path).replace("\\", "/").split(self.root.rstrip("/") or "artifactory", maxsplit=1)[0].rstrip("/")
+        if _PY_GREATER_THEN_3_11:
+            super(PureArtifactoryPath, self).__init__(*args, **kwargs)
+        else:
+            super(PureArtifactoryPath, self).__init__()
+        # if _PY_GREATER_THEN_3_11:
+        if args:
+            path = args[0]
+            str_path = str(path)
+            self._drive = ''
+            if '/artifactory/' in str_path:
+                before, after = str_path.split('/artifactory/', maxsplit=1)
+                self._drive = before.rstrip("/") + "/artifactory"
 
-    @property
-    def drive(self):
-        return self._drive
+                # urllib.parse.quote(str_path)
+                # urllib.parse.urlsplit(str_path)
+                if '//artifactory' in str_path:
+                    self._drive = before.rstrip("/") + "//artifactory"
 
-    if _PY_GREATER_THEN_3_11:
-        def __div__(self, other):
-            return self.joinpath(other)
+                # if str_path.endswith('/') and not str_path.endswith('/artifactory/'):
+                #     self._drive = before.rstrip("/") + "/artifactoy"
 
-        def __truediv__(self, other):
-            return self.joinpath(other)
+                # self._root = '/' + after.split('/', maxsplit=1)[0].rstrip("/") + "/"
+                # if not after:
+                #     self._root = str_path.rstrip("/") + "/"
+            elif str_path.endswith('/artifactory'):
+                self._root = ''
+                self._drive = str_path
+            else:
+                self._drive = str_path.split(self.root.rstrip("/") or "artifactory", maxsplit=1)[0].rstrip("/")
+            # self._drive = 'artifactory/' + self._drive
+        else:
+            self._drive = 'artifactory'
+        if not _PY_GREATER_THEN_3_11:
+            self._drv = self._drive
+        x = 5
+
+    # if _PY_GREATER_THEN_3_11:
+    #     @property
+    #     def drive(self):
+    #         return self._drive
+
+    # if _PY_GREATER_THEN_3_11:
+    #     def __div__(self, other):
+    #         return self.joinpath(other)
+
+    #     def __truediv__(self, other):
+    #         return self.joinpath(other)
 
 
 
@@ -1595,14 +1628,29 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
     >>> ArtifactoryPath("http://b//reponame").root
     '/reponame/'
 
+    >>> ArtifactoryPath("http://b/artifactory").root
+    ''
+
     >>> ArtifactoryPath("http://b//reponame").drive
     'http://b'
+
+    >>> ArtifactoryPath("http://b/artifactory").drive
+    'http://b/artifactory'
+
+    >>> ArtifactoryPath("http://b/artifactory/").drive
+    'http://b/artifactory'
 
     >>> ArtifactoryPath("http://b/reponame").drive
     'http://b'
 
     >>> ArtifactoryPath("http://b//artifactory/reponame").drive
     'http://b//artifactory'
+
+    >>> str(ArtifactoryPath("http://b/artifactory/") / "reponame" / "path.txt")
+    'http://b/artifactory/reponame/path.txt'
+
+    >>> str(ArtifactoryPath("http://b/artifactory") / "reponame" / "path.txt")
+    'http://b/artifactory/reponame/path.txt'
     """
 
     if sys.version_info.major == 3 and sys.version_info.minor >= 10:
