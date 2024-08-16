@@ -2017,6 +2017,11 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
         __div__ = __truediv__
         __rdiv__ = __rtruediv__
 
+    def __str__(self):
+        """
+        Return the string representation of the path with the drive
+        """
+        return self._flavour.sep.join([p.strip('/') for p in self.parts])
     def _make_child(self, args):
         obj = super(ArtifactoryPath, self)._make_child(args)
         obj.auth = self.auth
