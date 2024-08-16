@@ -466,6 +466,9 @@ class _ArtifactoryFlavour:
 
         >>> _ArtifactoryFlavour().parse_parts(["/", "libs-snapshot-local", "org/acme"])
         ('', '', ['libs-snapshot-local', 'org', 'acme'])
+
+        >>> _ArtifactoryFlavour().parse_parts(["http://b/artifactory/reponame/path.txt"])
+        ('http://b/artifactory', '/reponame/', ['http://b/artifactory/reponame/', 'path.txt'])
         """
         parsed = []
         sep = self.sep
@@ -1640,6 +1643,21 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
     >>> ArtifactoryPath("http://b/artifactory/").drive
     'http://b/artifactory'
 
+    >>> ArtifactoryPath("http://b/artifactory/").root
+    ''
+
+    >>> ArtifactoryPath("http://b/artifactory").path_in_repo
+    '/'
+
+    >>> ArtifactoryPath("http://b/artifactory/").path_in_repo
+    '/'
+
+    >>> ArtifactoryPath("http://b/artifactory/reponame").path_in_repo
+    '/'
+
+    >>> ArtifactoryPath("http://b/artifactory/reponame/file.txt").path_in_repo
+    '/file.txt'
+
     >>> ArtifactoryPath("http://b/reponame").drive
     'http://b'
 
@@ -1649,8 +1667,60 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
     >>> str(ArtifactoryPath("http://b/artifactory/") / "reponame" / "path.txt")
     'http://b/artifactory/reponame/path.txt'
 
+    >>> ArtifactoryPath("http://b/artifactory/reponame/path.txt").parts
+    ('http://b/artifactory/reponame/', 'path.txt')
+
+    >>> str(ArtifactoryPath("http://b/artifactory/reponame/path.txt"))
+    'http://b/artifactory/reponame/path.txt'
+
     >>> str(ArtifactoryPath("http://b/artifactory") / "reponame" / "path.txt")
     'http://b/artifactory/reponame/path.txt'
+
+    >>> str(ArtifactoryPath("http://b/artifactory/") / "reponame" / "path.txt")
+    'http://b/artifactory/reponame/path.txt'
+
+    >>> str(ArtifactoryPath("http://b/artifactory") / "reponame" / "path.txt")
+    'http://b/artifactory/reponame/path.txt'
+
+    >>> str(ArtifactoryPath("http://b/artifactory/"))
+    'http://b/artifactory'
+
+    >>> ArtifactoryPath("http://b/artifactory").parts
+    ('http://b/artifactory',)
+
+    >>> (ArtifactoryPath("http://b/artifactory") / "reponame" / "path.txt").parts
+    ('http://b/artifactory', 'path.txt')
+
+    >>> (ArtifactoryPath("http://b/artifactory/") / "reponame" / "path.txt").parts
+    ('http://b/artifactory', 'path.txt')
+
+
+    >>> (ArtifactoryPath("http://b/artifactory") / "reponame").parts
+    ('http://b/artifactory',)
+
+    >>> (ArtifactoryPath("http://b/artifactory") / "reponame").drive
+    'http://b/artifactory'
+
+    >>> (ArtifactoryPath("http://b/artifactory") / "reponame").root
+    '/reponame/'
+
+    >>> (ArtifactoryPath("http://b/artifactory") / "reponame").path_in_repo
+    '/'
+
+    >>> (ArtifactoryPath("http://b/artifactory") / "reponame").parts
+    ('http://b/artifactory',)
+
+    >>> (ArtifactoryPath("http://b/artifactory") / "reponame" / "path.txt").drive
+    'http://b/artifactory'
+
+    >>> (ArtifactoryPath("http://b/artifactory") / "reponame" / "path.txt").root
+    '/reponame/'
+
+    >>> (ArtifactoryPath("http://b/artifactory") / "reponame" / "path.txt").path_in_repo
+    '/path.txt'
+
+    >>> (ArtifactoryPath("http://b/artifactory") / "reponame" / "path.txt").parts
+    ('http://b/artifactory', 'path.txt')
     """
 
     if sys.version_info.major == 3 and sys.version_info.minor >= 10:
