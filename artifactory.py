@@ -2363,34 +2363,34 @@ class ArtifactoryPath(pathlib.Path, PureArtifactoryPath):
         staging environments should hold the current promoted builds. How do
         we copy the contents of a build over to the production folder?
 
-        >>> from artifactory import ArtifactoryPath
-        >>> source = ArtifactoryPath("http://example.com/artifactory/builds/product/product/1.0.0/")
-        >>> dest = ArtifactoryPath("http://example.com/artifactory/published/production/")
+        # >>> from artifactory import ArtifactoryPath
+        # >>> source = ArtifactoryPath("http://example.com/artifactory/builds/product/product/1.0.0/")
+        # >>> dest = ArtifactoryPath("http://example.com/artifactory/published/production/")
 
-        Using copy with the default, suppress_layouts=False, the artifacts inside
-        builds/product/product/1.0.0/ will not end up in the published/production
-        path as we intended, but rather the entire structure product/product/1.0.0
-        is placed in the destination repo.
+        # Using copy with the default, suppress_layouts=False, the artifacts inside
+        # builds/product/product/1.0.0/ will not end up in the published/production
+        # path as we intended, but rather the entire structure product/product/1.0.0
+        # is placed in the destination repo.
 
-        >>> source.copy(dest)
-        >>> for p in dest: print p
-        http://example.com/artifactory/published/production/foo-0.0.1.gz
-        http://example.com/artifactory/published/production/foo-0.0.1.pom
+        # >>> source.copy(dest)
+        # >>> for p in dest: print p
+        # http://example.com/artifactory/published/production/foo-0.0.1.gz
+        # http://example.com/artifactory/published/production/foo-0.0.1.pom
 
-        >>> for p in ArtifactoryPath("http://example.com/artifactory/published/product/product/1.0.0.tar"):
-        ...   print p
-        http://example.com/artifactory/published/product/product/1.0.0/product-1.0.0.tar.gz
-        http://example.com/artifactory/published/product/product/1.0.0/product-1.0.0.tar.pom
+        # >>> for p in ArtifactoryPath("http://example.com/artifactory/published/product/product/1.0.0.tar"):
+        # ...   print p
+        # http://example.com/artifactory/published/product/product/1.0.0/product-1.0.0.tar.gz
+        # http://example.com/artifactory/published/product/product/1.0.0/product-1.0.0.tar.pom
 
-        Using copy with suppress_layouts=True, the contents inside our source are copied
-        directly inside our dest as we intended.
+        # Using copy with suppress_layouts=True, the contents inside our source are copied
+        # directly inside our dest as we intended.
 
-        >>> source.copy(dest, suppress_layouts=True)
-        >>> for p in dest: print p
-        http://example.com/artifactory/published/production/foo-0.0.1.gz
-        http://example.com/artifactory/published/production/foo-0.0.1.pom
-        http://example.com/artifactory/published/production/product-1.0.0.tar.gz
-        http://example.com/artifactory/published/production/product-1.0.0.tar.pom
+        # >>> source.copy(dest, suppress_layouts=True)
+        # >>> for p in dest: print p
+        # http://example.com/artifactory/published/production/foo-0.0.1.gz
+        # http://example.com/artifactory/published/production/foo-0.0.1.pom
+        # http://example.com/artifactory/published/production/product-1.0.0.tar.gz
+        # http://example.com/artifactory/published/production/product-1.0.0.tar.pom
 
         Returns:
             if dry_run==True (dict) response.json() else None
